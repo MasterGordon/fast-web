@@ -1,19 +1,15 @@
-import { getStyleRules } from "~/system/style-rules";
+import { renderStyle } from "~/system/style-rules";
 import { pushStyle } from "./fast-web";
+import type { Styles } from "~/types";
 
 interface GlobalProps {
-  css?: Record<string, JSX.CSSProperties>;
+  css?: Record<string, Styles>;
 }
 
 export default function Global({ css = {} }: GlobalProps) {
-  const stylesArray = Object.entries(css).map<[string, string[]]>(
-    ([key, value]) => {
-      return [key, getStyleRules(value)];
-    },
-  );
-
-  stylesArray.forEach(([key, value]) => {
-    pushStyle(`${key} {${value.join(" ")}}`);
+  Object.entries(css).forEach(([key, value]) => {
+    const style = renderStyle(value, key);
+    pushStyle(style.css);
   });
 
   return null;

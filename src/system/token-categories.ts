@@ -1,8 +1,17 @@
-const tokenTypes = ["color", "space", "font"] as const;
+import type { CSSProperties } from "~/types";
+
+const tokenTypes = [
+  "color",
+  "space",
+  "font",
+  "font-size",
+  "font-weight",
+  "border-radius",
+] as const;
 type TokenType = (typeof tokenTypes)[number];
 
 export const shorthand = {
-  marginX: (value: string) => [
+  marginX: <T>(value: T) => [
     {
       key: "marginLeft",
       value,
@@ -12,7 +21,7 @@ export const shorthand = {
       value,
     },
   ],
-  marginY: (value: string) => [
+  marginY: <T>(value: T) => [
     {
       key: "marginTop",
       value,
@@ -22,7 +31,27 @@ export const shorthand = {
       value,
     },
   ],
-  paddingX: (value: string) => [
+  mX: <T>(value: T) => [
+    {
+      key: "marginLeft",
+      value,
+    },
+    {
+      key: "marginRight",
+      value,
+    },
+  ],
+  mY: <T>(value: T) => [
+    {
+      key: "marginTop",
+      value,
+    },
+    {
+      key: "marginBottom",
+      value,
+    },
+  ],
+  paddingX: <T>(value: T) => [
     {
       key: "paddingLeft",
       value,
@@ -32,7 +61,27 @@ export const shorthand = {
       value,
     },
   ],
-  paddingY: (value: string) => [
+  paddingY: <T>(value: T) => [
+    {
+      key: "paddingTop",
+      value,
+    },
+    {
+      key: "paddingBottom",
+      value,
+    },
+  ],
+  pX: <T>(value: T) => [
+    {
+      key: "paddingLeft",
+      value,
+    },
+    {
+      key: "paddingRight",
+      value,
+    },
+  ],
+  pY: <T>(value: T) => [
     {
       key: "paddingTop",
       value,
@@ -63,8 +112,13 @@ export const categoryMap = {
   paddingX: "space",
   paddingY: "space",
   gap: "space",
+  height: "space",
+  width: "space",
   fontFamily: "font",
-} as const satisfies Partial<Record<keyof JSX.CSSProperties, TokenType>>;
+  fontSize: "font-size",
+  fontWeight: "font-weight",
+  borderRadius: "border-radius",
+} as const satisfies Partial<Record<keyof CSSProperties, TokenType>>;
 
 export const getCategory = (value: string) => {
   return value in categoryMap

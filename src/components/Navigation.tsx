@@ -13,13 +13,21 @@ export default function Navigation() {
     <nav
       style={{
         display: "flex",
-        gap: "1rem",
+        alignItems: "center",
+        margin: "auto",
+        gap: "$2",
       }}
     >
       {items.map((item) => (
         <a
           style={{
-            backgroundColor: "$gray.700",
+            _hover: {
+              backgroundColor: "$gray.900",
+            },
+            fontWeight: "$semibold",
+            paddingY: "$2",
+            paddingX: "$4",
+            borderRadius: "$md",
           }}
           href={item.href}
         >

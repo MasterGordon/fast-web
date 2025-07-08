@@ -1,55 +1,99 @@
+import { pseudoClasses, type Styles } from "~/types";
 import { getCategory, shorthand } from "./token-categories";
+import { crazyHash } from "./crazyHash";
 
 export const camelToKebab = (str: string) => {
   return str.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, "$1-$2").toLowerCase();
 };
 
-export const getStyleRules = (style: JSX.CSSProperties) => {
-  const styles = Object.entries(style).map(([key, value]) => {
-    return {
-      key,
-      value,
-    };
-  });
-  const rules = [];
-  while (styles.length) {
-    const { key, value } = styles.shift()!;
-    if (key in shorthand) {
-      const shorthandRules = shorthand[key as keyof typeof shorthand](value);
-      styles.unshift(...shorthandRules);
-      continue;
-    }
+const resolveVars = (key: string, value: string) => {
+  const match = value.match(/\$([a-zA-Z0-9\.\-]+)/g);
+  if (match) {
+    const category = getCategory(key);
+    const replaceValue = match.reduce((v, m) => {
+      return v.replace(
+        m,
+        `var(--${category}${m.replaceAll("$", "").replaceAll(".", "-")})`,
+      );
+    }, value);
+    return replaceValue;
+  }
+  return value;
+};
 
-    const kKey = camelToKebab(key);
-    if (typeof value === "number") {
-      rules.push(`${kKey}: ${value}px;`);
-    } else if (typeof value === "string") {
-      const match = value.match(/\$([a-zA-Z0-9\.\-]+)/g);
-      if (match) {
-        const category = getCategory(key);
-        const replaceValue = match.reduce((v, m) => {
-          return v.replace(
-            m,
-            `var(--${category}${m.replaceAll("$", "").replaceAll(".", "-")})`,
-          );
-        }, value);
-        rules.push(`${kKey}: ${replaceValue};`);
-      } else {
-        rules.push(`${kKey}: ${value};`);
-      }
+const renderRule = (key: string, value: string | number | string[]): string => {
+  const kKey = camelToKebab(key);
+  if (typeof value === "number") {
+    return `${kKey}: ${value}px;`;
+  }
+  if (typeof value === "string") {
+    return `${kKey}: ${resolveVars(key, value)};`;
+  }
+  return `${kKey}: ${value.join(" ")};`;
+};
+
+const partitionStyles = (style: Styles) => {
+  const selectorStylesMapping: Record<
+    string,
+    Record<string, string | number | string[]>
+  > = {
+    "&": {},
+  };
+
+  for (const [key, value] of Object.entries(style)) {
+    if (typeof value === "object" && !Array.isArray(value)) {
+      const selector =
+        pseudoClasses[key.substring(1) as keyof typeof pseudoClasses] ?? key;
+      selectorStylesMapping[selector] = value;
     } else {
-      rules.push(`${kKey}: ${value.join(" ")};`);
+      selectorStylesMapping["&"][key] = value;
     }
+  }
+  return selectorStylesMapping;
+};
+
+const resolveShorthand = (
+  key: string,
+  value: string | number | string[],
+): { key: string; value: string | number | string[] }[] => {
+  if (key in shorthand) {
+    return shorthand[key as keyof typeof shorthand](value);
+  }
+  return [{ key, value }];
+};
+
+export const getStyleRules = (style: Styles) => {
+  const selectorStylesMapping = partitionStyles(style);
+  const rules: Record<string, string[]> = {};
+  for (const [selector, styles] of Object.entries(selectorStylesMapping)) {
+    const stylePairs = Object.entries(styles).reduce(
+      (acc, [key, value]) => {
+        const resolvedShorthand = resolveShorthand(key, value);
+        return [...acc, ...resolvedShorthand];
+      },
+      [] as { key: string; value: string | number | string[] }[],
+    );
+    rules[selector] = stylePairs.map(({ key, value }) => {
+      return renderRule(key, value);
+    });
   }
   return rules;
 };
 
-export const renderStyle = (style: JSX.CSSProperties) => {
-  const rules = getStyleRules(style);
-  const sortedRules = rules.sort();
-  const rulesString = sortedRules.join(" ");
-  const hash = Bun.hash(rulesString);
-  const className = `style-${hash.toString(36)}`;
-  const css = `.${className} {${rulesString}}`;
+const getRulesClassName = (rules: Record<string, string[]>) => {
+  const flatRules = Object.values(rules).flat();
+  flatRules.push(...Object.keys(rules));
+  const sortedRules = flatRules.sort();
+  const rulesString = sortedRules.join(";");
+  return `f${crazyHash(rulesString)}`;
+};
+
+export const renderStyle = (style: Styles, selectorOverride?: string) => {
+  const rulesMapping = getStyleRules(style);
+  const className = selectorOverride ?? getRulesClassName(rulesMapping);
+  let css = "";
+  for (const [selector, rules] of Object.entries(rulesMapping)) {
+    css += `${selector.replaceAll("&", selectorOverride ?? "." + className)} {${rules.join(" ")}}`;
+  }
   return { className, css };
 };

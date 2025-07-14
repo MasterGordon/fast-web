@@ -11,15 +11,16 @@ const formatBytes = (bytes: number) => {
   return bytes + "B";
 };
 
-export const requestLog = (handler: (req: Request) => Promise<Response>) => {
-  return async (req: Request) => {
-    const start = performance.now();
-    const response = await handler(req);
-    const bytes = await response.clone().bytes();
-    const delta = performance.now() - start;
-    console.log(
-      `[${req.method}] ${req.url} -> ${response.headers.get("Content-Type")} ${formatBytes(bytes.length)} in ${delta}ms`,
-    );
-    return response;
+export const requestLog =
+  (name?: string) => (handler: (req: Request) => Promise<Response>) => {
+    return async (req: Request) => {
+      const start = performance.now();
+      const response = await handler(req);
+      const bytes = await response.clone().bytes();
+      const delta = performance.now() - start;
+      console.log(
+        `[${req.method}] ${req.url}${name ? " " + name : ""} -> ${response.headers.get("Content-Type")} ${formatBytes(bytes.length)} in ${delta}ms`,
+      );
+      return response;
+    };
   };
-};

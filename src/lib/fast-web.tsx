@@ -2,6 +2,7 @@ import { camelToKebab, renderStyle } from "~/system/style-rules";
 import { transform } from "lightningcss";
 import reset from "./reset.css" with { type: "text" };
 import { AsyncLocalStorage } from "async_hooks";
+import path from "path";
 
 interface RenderContext {
   styles: string[];
@@ -121,4 +122,28 @@ export const fillTemplate = (
   return Object.entries(data).reduce((acc, [key, value]) => {
     return acc.replace(`<!-- ${key} -->`, value);
   }, template);
+};
+
+export const resolveLayoutPaths = async (file: string, rootDir: string) => {
+  const layouts = [];
+  let dir = file;
+  console.log(path.normalize(dir));
+  console.log(path.normalize(rootDir));
+  do {
+    dir = path.join(dir, "..");
+    const layoutFile = path.join(dir, "_layout.tsx");
+    if (await Bun.file(layoutFile).exists()) {
+      layouts.push(layoutFile);
+    }
+  } while (path.normalize(dir) != path.normalize(rootDir));
+  return layouts;
+};
+
+export const wrapLayouts = async (element: JSX.Element, layouts: string[]) => {
+  let wrapped = element;
+  for (const part of layouts) {
+    const Layout = (await import(part)).default;
+    wrapped = <Layout>{wrapped}</Layout>;
+  }
+  return wrapped;
 };

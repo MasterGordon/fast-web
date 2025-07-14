@@ -15,10 +15,6 @@
   },
   "dependencies": {
     "lightningcss": "^1.29.1",
-    "pokedex-promise-v2": "^4.2.1",
-    "serve-static-bun": "^0.5.3",
-    "tree-sitter-cli": "^0.25.2",
-    "tree-sitter-typescript": "^0.23.2",
-    "web-tree-sitter": "^0.25.2"
+    "serve-static-bun": "^0.5.3"
   }
 }

@@ -12,19 +12,17 @@ export default async function Index() {
     offset: page * 20,
   });
   return (
-    <Layout>
-      <>
-        <div>Hello World</div>
-        <Counter />
-        <Counter />
-        <ul>
-          {pokemon.results.map((r) => (
-            <li>{r.name}</li>
-          ))}
-        </ul>
-        <Link href={`/?page=${page - 1}`}>Prev</Link>
-        <Link href={`/?page=${page + 1}`}>Next</Link>
-      </>
-    </Layout>
+    <>
+      <div>Hello World</div>
+      <Counter />
+      <Counter />
+      <ul>
+        {pokemon.results.map((r) => (
+          <li>{r.name}</li>
+        ))}
+      </ul>
+      <Link href={`/?page=${page - 1}`}>Prev</Link>
+      <Link href={`/?page=${page + 1}`}>Next</Link>
+    </>
   );
 }

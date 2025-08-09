@@ -22,7 +22,13 @@ const router = new Bun.FileSystemRouter({
 
 const staticPublic = staticDir("./public");
 
-const scriptsGlob = new Bun.Glob(__dirname + "/scripts/*");
+const devScripts = [
+  ...new Bun.Glob(__dirname + "/scripts/*.dev.ts").scanSync(),
+];
+const allScripts = [...new Bun.Glob(__dirname + "/scripts/*").scanSync()];
+const scriptEntries = import.meta.env.DEV
+  ? allScripts
+  : allScripts.filter((s) => !devScripts.includes(s));
 
 const server = Bun.serve({
   port: 8080,
@@ -46,10 +52,7 @@ const server = Bun.serve({
       );
 
       const systemScripts = await Bun.build({
-        entrypoints: [
-          ...scriptsGlob.scanSync(),
-          "./src/components/Counter.state.ts",
-        ],
+        entrypoints: scriptEntries,
         minify: true,
         plugins: [myPlugin],
       });
@@ -60,7 +63,7 @@ const server = Bun.serve({
         ),
       );
 
-      const responseData = fillTemplate(template, {
+      const responseData = fillTemplate(template as unknown as string, {
         head: renderResult.head + scripts.join(""),
         body: renderResult.html,
       });
@@ -80,6 +83,9 @@ const server = Bun.serve({
     open: async (ws) => {
       console.log("connected");
       ws.subscribe("reload");
+    },
+    close: () => {
+      console.log("dc");
     },
   },
 });

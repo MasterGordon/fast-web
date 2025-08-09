@@ -91,6 +91,30 @@ export const shorthand = {
       value,
     },
   ],
+  maxW: <T>(value: T) => [
+    {
+      key: "maxWidth",
+      value,
+    },
+  ],
+  maxH: <T>(value: T) => [
+    {
+      key: "maxHeight",
+      value,
+    },
+  ],
+  minW: <T>(value: T) => [
+    {
+      key: "minWidth",
+      value,
+    },
+  ],
+  minH: <T>(value: T) => [
+    {
+      key: "minHeight",
+      value,
+    },
+  ],
 };
 
 export const categoryMap = {
@@ -114,6 +138,10 @@ export const categoryMap = {
   gap: "space",
   height: "space",
   width: "space",
+  maxHeight: "space",
+  maxWidth: "space",
+  minHeight: "space",
+  minWidth: "space",
   fontFamily: "font",
   fontSize: "font-size",
   fontWeight: "font-weight",

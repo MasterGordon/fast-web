@@ -34,6 +34,10 @@ export type CSSProperties = CSS.Properties & {
   mY?: CSS.Properties["marginTop"];
   pX?: CSS.Properties["paddingLeft"];
   pY?: CSS.Properties["paddingTop"];
+  maxW?: CSS.Properties["maxWidth"];
+  maxH?: CSS.Properties["maxHeight"];
+  minW?: CSS.Properties["minWidth"];
+  minH?: CSS.Properties["minHeight"];
 };
 export type CSSDuration = `${number}s` | `${number}ms`;
 export type EasingFunction =

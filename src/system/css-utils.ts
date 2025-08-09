@@ -6,6 +6,6 @@ type Transition =
   | [BaseCSSProperty, CSSDuration, EasingFunction]
   | [BaseCSSProperty, CSSDuration, EasingFunction, CSSDuration];
 
-export const transition = (transitions: Transition[]) => {
+export const transition = (...transitions: Transition[]) => {
   return transitions.map((t) => t.join(" ")).join(",");
 };

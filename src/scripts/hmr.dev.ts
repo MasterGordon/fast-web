@@ -5,7 +5,7 @@ interface DevWindow extends Window {
 declare const window: DevWindow;
 
 if (!window.devListening) {
-  const ws = new WebSocket("ws://localhost:8080/ws");
+  const ws = new WebSocket("ws://localhost:8081/ws");
   ws.addEventListener("message", () => {
     fetch(window.location.href).then(async (res) => {
       window.document.documentElement.innerHTML = await res.text();

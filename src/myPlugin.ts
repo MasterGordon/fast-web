@@ -11,16 +11,14 @@ export const myPlugin: BunPlugin = {
         filter: /\.tsx?$/,
       },
       async (args) => {
-        console.log("loading", args.path);
         const path = require.resolve(args.path);
         let contents = await Bun.file(path).text();
+        return { contents };
         const createStateCalls = contents.matchAll(createStateStringRegex);
         createStateCalls.forEach((match) => {
-          console.log(match);
           let braces = 1;
           let index = match.index + createStateString.length;
           let needsComma = false;
-          console.log(contents[index]);
           do {
             index++;
             if (contents[index] == "(") braces++;
@@ -28,7 +26,6 @@ export const myPlugin: BunPlugin = {
             else if (contents[index] == ",") needsComma = false;
             else if (contents[index].trim().length) needsComma = true;
           } while (braces > 0);
-          console.log(contents[index]);
           const meta = {
             path,
             hash: crazyHash(contents),
@@ -38,7 +35,6 @@ export const myPlugin: BunPlugin = {
             (needsComma ? ", " : "") +
             JSON.stringify(meta) +
             contents.substring(index);
-          console.log(contents);
         });
         // console.log(contents);
         return {

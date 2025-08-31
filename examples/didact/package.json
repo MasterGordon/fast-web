@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "tsc": "tsc"
+  },
   "devDependencies": {
     "typescript": "^5.9.2",
     "@types/bun": "latest"

@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run index.html"
+    "dev": "bun run index.html",
+    "tsc": "tsc"
   },
   "devDependencies": {
     "@types/bun": "latest"

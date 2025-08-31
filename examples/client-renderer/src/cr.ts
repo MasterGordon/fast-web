@@ -1,5 +1,6 @@
-import { domFiber, ElementSymbol, FiberNodeSymbol } from "./symbols";
+import { domFiber, domProps, ElementSymbol, FiberNodeSymbol } from "./symbols";
 import {
+  debugEffectTag,
   EffectTag,
   isFunctionFiber,
   isHostFiber,
@@ -11,7 +12,7 @@ import {
   type RootFiber,
 } from "./types";
 
-let unitOfWork: FiberNode | null = null;
+let unitOfWork: FiberNode | RootFiber | null = null;
 let wipFiber: FiberNode;
 let hookIndex: number;
 let effectFiber: FiberNode | null = null;
@@ -27,11 +28,24 @@ const createTextElement = (text: string): JSXElement => ({
   },
 });
 
-function performUnitOfWork(fiber: FiberNode) {
+const getRootFiber = (fiber: FiberNode): RootFiber => {
+  let root = fiber.parent;
+  while (root) {
+    if (root.isRoot) {
+      return root as RootFiber;
+    }
+    root = root.parent;
+  }
+  throw "Can't find root";
+};
+
+function performUnitOfWork(fiber: FiberNode | RootFiber) {
   if (isFunctionFiber(fiber)) {
     updateFunctionComponent(fiber);
   } else if (isHostFiber(fiber)) {
     updateHostComponent(fiber);
+  } else if (fiber.isRoot) {
+    reconcileChildren(fiber, fiber.pendingProps.children);
   }
 
   if (fiber.child) {
@@ -90,7 +104,9 @@ function updateFunctionComponent(fiber: FunctionFiber) {
 
 function updateHostComponent(fiber: HostFiber) {
   wipFiber = fiber;
-  reconcileChildren(fiber, fiber.pendingProps.children);
+  if (fiber.type !== textElementType) {
+    reconcileChildren(fiber, fiber.pendingProps.children);
+  }
 }
 
 function pushEffect(fiber: FiberNode) {
@@ -112,7 +128,10 @@ function pushEffect(fiber: FiberNode) {
   wipRoot.lastEffect = fiber;
 }
 
-function reconcileChildren(wipFiber: FiberNode, children: Child[] = []) {
+function reconcileChildren(
+  wipFiber: FiberNode | RootFiber,
+  children: Child[] = [],
+) {
   let index = 0;
   let oldFiber = wipFiber.alternate?.child;
   let prevSibling: FiberNode | null = null;
@@ -202,32 +221,105 @@ function findDomParent(fiber: FiberNode) {
   return null;
 }
 
+function updateProps(fiber: HostFiber) {
+  const dom = fiber.dom;
+  if (dom instanceof Text) {
+    dom.nodeValue = fiber.pendingProps.nodeValue;
+    return;
+  }
+  if (!dom || !(dom instanceof HTMLElement)) {
+    return;
+  }
+  const prevProps = fiber.alternate?.pendingProps ?? {};
+  const nextProps = fiber.pendingProps ?? {};
+  let propNames = new Set([
+    ...Object.keys(prevProps),
+    ...Object.keys(nextProps),
+  ]);
+  for (const propName of propNames) {
+    if (
+      propName === "children" ||
+      propName === "ref" ||
+      propName.startsWith("on")
+    ) {
+      continue;
+    }
+    const prevProp = prevProps[propName];
+    const nextProp = nextProps[propName];
+    if (nextProp === undefined) {
+      dom.removeAttribute(propName);
+      continue;
+    }
+    if (prevProp !== nextProp) {
+      // Handle special cases
+      if (propName === "className") {
+        dom.className = nextProp;
+      } else if (propName === "htmlFor") {
+        (dom as HTMLLabelElement).htmlFor = nextProp;
+      } else if (propName === "style" && typeof nextProp === "object") {
+        Object.assign(dom.style, nextProp);
+      } else {
+        dom.setAttribute(propName, nextProp);
+      }
+    }
+  }
+}
+
+export function scheduleRerender(fiber: FiberNode) {
+  const root = getRootFiber(fiber);
+  wipRoot = root.alternate;
+  unitOfWork = root.alternate;
+  requestIdleCallback(workLoop);
+}
+
 function commitRoot() {
   if (!wipRoot) return;
   effectFiber = wipRoot.firstEffect;
   while (effectFiber) {
+    console.log(
+      "commit",
+      debugEffectTag(effectFiber.effectTag),
+      typeof effectFiber.type !== "function"
+        ? effectFiber.type
+        : effectFiber.type.name,
+    );
     // Do effect
-    if (effectFiber.effectTag & EffectTag.Placement) {
-      let dom: Node;
+    if (
+      effectFiber.effectTag & EffectTag.Placement &&
+      isHostFiber(effectFiber)
+    ) {
       if (effectFiber.type === textElementType) {
-        dom = document.createTextNode(effectFiber.pendingProps.nodeValue);
+        effectFiber.dom = document.createTextNode(
+          effectFiber.pendingProps.nodeValue,
+        );
       } else {
-        dom = document.createElement(effectFiber.type as string);
-        // TODO: Set props
-        // TODO: Maybe add event section
+        effectFiber.dom = document.createElement(effectFiber.type as string);
+        updateProps(effectFiber);
+        (effectFiber.dom as HTMLElement)[domFiber] = effectFiber;
+        (effectFiber.dom as HTMLElement)[domProps] = effectFiber.pendingProps;
         // TODO: Maybe add ref in far future might consider a general on mount and on unmount event
       }
-      effectFiber.dom = dom;
       const parent = findDomParent(effectFiber);
       if (parent?.dom) {
-        console.log("Appending", dom, "into", parent.dom);
-        parent.dom.appendChild(dom);
+        parent.dom.appendChild(effectFiber.dom);
       } else {
         throw "Can't commit without parent";
       }
     }
+    if (effectFiber.effectTag & EffectTag.Deletion) {
+      if (effectFiber.dom && effectFiber.dom instanceof HTMLElement) {
+        effectFiber.dom.remove();
+      }
+    }
+    if (effectFiber.effectTag & EffectTag.Update && isHostFiber(effectFiber)) {
+      updateProps(effectFiber);
+    }
     effectFiber = effectFiber.nextEffect;
+    wipRoot.lastEffect = effectFiber;
   }
+
+  wipRoot.firstEffect = null;
+  wipRoot.lastEffect = null;
   wipRoot = null;
 }
 
@@ -264,6 +356,7 @@ const getEventProp = (eventType: string) => {
 };
 function handleEvent(event: Event, root: RootFiber) {
   const target = event.target as HTMLElement;
+  if (target === root.dom) return;
   const type = event.type;
   let node: FiberNode | RootFiber | null = target[domFiber] ?? null;
   let propagationStopped = false;
@@ -284,7 +377,7 @@ function handleEvent(event: Event, root: RootFiber) {
 }
 
 export function createRootFiber(root: HTMLElement): RootFiber {
-  const rootFiber: RootFiber = {
+  const alternate: RootFiber = {
     $$typeof: FiberNodeSymbol,
     type: undefined,
     key: null,
@@ -302,6 +395,25 @@ export function createRootFiber(root: HTMLElement): RootFiber {
     firstEffect: null,
     lastEffect: null,
   };
+  const rootFiber: RootFiber = {
+    $$typeof: FiberNodeSymbol,
+    type: undefined,
+    key: null,
+    child: null,
+    sibling: null,
+    parent: null,
+    index: 0,
+    dom: root,
+    hooks: [],
+    pendingProps: null,
+    effectTag: EffectTag.NoEffect,
+    alternate,
+    nextEffect: null,
+    isRoot: true,
+    firstEffect: null,
+    lastEffect: null,
+  };
+  alternate.alternate = rootFiber;
   for (const event of events) {
     rootFiber.dom.addEventListener(event, (event) =>
       handleEvent(event, rootFiber),
@@ -312,10 +424,15 @@ export function createRootFiber(root: HTMLElement): RootFiber {
 
 export function render(rootFiber: RootFiber, element: JSXElement) {
   wipRoot = rootFiber;
-  const fiber = createFiberFromElement(element);
-  fiber.parent = rootFiber;
-  rootFiber.child = fiber;
-  wipRoot.child = fiber;
-  unitOfWork = fiber;
-  console.log(fiber);
+  rootFiber.pendingProps = {
+    children: [element],
+  };
+  rootFiber.alternate!.pendingProps = {
+    children: [element],
+  };
+  // const fiber = createFiberFromElement(element);
+  // fiber.parent = rootFiber;
+  // rootFiber.child = fiber;
+  // wipRoot.child = fiber;
+  unitOfWork = wipRoot;
 }

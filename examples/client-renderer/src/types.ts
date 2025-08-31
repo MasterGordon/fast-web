@@ -25,6 +25,18 @@ export enum EffectTag {
   Layout = 0x20,
 }
 
+export const debugEffectTag = (tag: EffectTag): string => {
+  const effects = [];
+  if (tag & EffectTag.Placement) effects.push("Placement");
+  if (tag & EffectTag.Update) effects.push("Update");
+  if (tag & EffectTag.Deletion) effects.push("Deletion");
+  if (tag & EffectTag.Hydration) effects.push("Hydration");
+  if (tag & EffectTag.Passive) effects.push("Passive");
+  if (tag & EffectTag.Layout) effects.push("Layout");
+  if (effects.length === 0) effects.push("NoEffect");
+  return effects.join(" | ");
+};
+
 export const StateHook = Symbol.for("cr.state-hook");
 export const EffectHook = Symbol.for("cr.effect-hook");
 type Hook =
@@ -63,16 +75,18 @@ export type FunctionFiber = FiberNode & {
   type: FC;
 };
 
-export type HostFiber = FiberNode & {
+export type HostFiber = Omit<FiberNode, "dom"> & {
   type: string;
+  dom: Node | null;
 };
 
-export type RootFiber = Omit<FiberNode, "type"> & {
+export type RootFiber = Omit<FiberNode, "type" | "dom" | "alternate"> & {
   type: undefined;
-  dom: HTMLElement;
+  dom: Node;
   isRoot: true;
   firstEffect: FiberNode | null;
   lastEffect: FiberNode | null;
+  alternate: RootFiber | null;
 };
 
 export const isFiberNode = (fiber: any): fiber is FiberNode =>

@@ -430,9 +430,5 @@ export function render(rootFiber: RootFiber, element: JSXElement) {
   rootFiber.alternate!.pendingProps = {
     children: [element],
   };
-  // const fiber = createFiberFromElement(element);
-  // fiber.parent = rootFiber;
-  // rootFiber.child = fiber;
-  // wipRoot.child = fiber;
   unitOfWork = wipRoot;
 }

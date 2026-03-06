@@ -4,6 +4,7 @@ import {
   EffectTag,
   isFunctionFiber,
   isHostFiber,
+  StateHook,
   type Child,
   type FiberNode,
   type FunctionFiber,
@@ -90,7 +91,31 @@ function createFiberFromElement(element: JSXElement): FiberNode {
     effectTag: EffectTag.NoEffect,
     alternate: null,
     nextEffect: null,
+    actions: null,
+    pendingChildren: [],
   };
+}
+
+function canBailout(fiber: FiberNode) {
+  const alternate = fiber.alternate;
+  if (!alternate) {
+    return false;
+  }
+  if (fiber.actions) {
+    return false;
+  }
+  const propKeys = Object.keys(fiber.pendingProps);
+  const pendingPropKeys = Object.keys(alternate.pendingProps);
+  if (propKeys.length !== pendingPropKeys.length) {
+    return false;
+  }
+  if (
+    propKeys.some(
+      (key) => fiber.pendingProps[key] !== alternate.pendingProps[key],
+    )
+  )
+    return false;
+  return true;
 }
 
 function updateFunctionComponent(fiber: FunctionFiber) {
@@ -98,8 +123,12 @@ function updateFunctionComponent(fiber: FunctionFiber) {
   hookIndex = 0;
   wipFiber.hooks = [];
   wipFiber.effectTag = EffectTag.NoEffect;
-  const children = [fiber.type(fiber.pendingProps)];
-  reconcileChildren(fiber, children);
+  if (fiber.alternate && canBailout(fiber)) {
+    fiber.pendingChildren = fiber.alternate.pendingChildren;
+  } else {
+    fiber.pendingChildren = [fiber.type(fiber.pendingProps)];
+  }
+  reconcileChildren(fiber, fiber.pendingChildren);
 }
 
 function updateHostComponent(fiber: HostFiber) {
@@ -128,6 +157,26 @@ function pushEffect(fiber: FiberNode) {
   wipRoot.lastEffect = fiber;
 }
 
+function createAlternate(oldFiber: FiberNode): FiberNode {
+  return {
+    $$typeof: FiberNodeSymbol,
+    type: oldFiber.type,
+    key: null,
+    child: null,
+    sibling: null,
+    parent: wipFiber,
+    index: 0,
+    dom: oldFiber.dom,
+    hooks: [],
+    pendingProps: oldFiber.pendingProps,
+    effectTag: EffectTag.Update,
+    alternate: oldFiber,
+    nextEffect: null,
+    actions: null,
+    pendingChildren: [],
+  };
+}
+
 function reconcileChildren(
   wipFiber: FiberNode | RootFiber,
   children: Child[] = [],
@@ -150,21 +199,9 @@ function reconcileChildren(
 
     const isSameType = oldFiber && element && element.type === oldFiber.type;
     if (isSameType && oldFiber) {
-      newFiber = {
-        $$typeof: FiberNodeSymbol,
-        type: oldFiber.type,
-        key: element.key ?? null,
-        child: null,
-        sibling: null,
-        parent: wipFiber,
-        index: 0,
-        dom: oldFiber.dom,
-        hooks: [],
-        pendingProps: element.props,
-        effectTag: EffectTag.Update,
-        alternate: oldFiber,
-        nextEffect: null,
-      };
+      newFiber = createAlternate(oldFiber);
+      newFiber.key = element.key ?? null;
+      newFiber.pendingProps = element.props;
       pushEffect(newFiber);
     }
 
@@ -183,6 +220,8 @@ function reconcileChildren(
         effectTag: EffectTag.Placement,
         alternate: null,
         nextEffect: null,
+        actions: null,
+        pendingChildren: [],
       };
       pushEffect(newFiber);
     }
@@ -394,6 +433,8 @@ export function createRootFiber(root: HTMLElement): RootFiber {
     isRoot: true,
     firstEffect: null,
     lastEffect: null,
+    actions: null,
+    pendingChildren: [],
   };
   const rootFiber: RootFiber = {
     $$typeof: FiberNodeSymbol,
@@ -412,6 +453,8 @@ export function createRootFiber(root: HTMLElement): RootFiber {
     isRoot: true,
     firstEffect: null,
     lastEffect: null,
+    actions: null,
+    pendingChildren: [],
   };
   alternate.alternate = rootFiber;
   for (const event of events) {
@@ -431,4 +474,21 @@ export function render(rootFiber: RootFiber, element: JSXElement) {
     children: [element],
   };
   unitOfWork = wipRoot;
+}
+
+export function logFiber(label: string) {
+  console.log(label, unitOfWork);
+}
+
+export function useState<T>(initialValue: T) {
+  if (!unitOfWork)
+    throw new Error("useState can only be used inside of a component!");
+  const fiber = unitOfWork;
+  const alternate = fiber.alternate?.hooks[hookIndex];
+  if (alternate && alternate.type !== StateHook)
+    throw new Error("Hook order changed smth.");
+  const value: T = alternate ? alternate.value : initialValue;
+  const setValue = (newValue: T) => {
+    fiber.hooks[hookIndex];
+  };
 }

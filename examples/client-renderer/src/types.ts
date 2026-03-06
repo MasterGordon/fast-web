@@ -42,10 +42,16 @@ export const EffectHook = Symbol.for("cr.effect-hook");
 type Hook =
   | {
       type: typeof StateHook;
+      value: any;
     }
   | {
       type: typeof EffectHook;
     };
+
+type Action = {
+  execute: (fiber: FiberNode) => void;
+  nextAction: null | Action;
+};
 
 export interface FiberNode {
   $$typeof: typeof FiberNodeSymbol;
@@ -63,12 +69,14 @@ export interface FiberNode {
   dom: Node | null;
   hooks: Hook[];
   pendingProps: any;
+  pendingChildren: Child[];
 
   effectTag: EffectTag;
 
   // Used for double buffering
   alternate: FiberNode | null;
   nextEffect: FiberNode | null;
+  actions: Action | null;
 }
 
 export type FunctionFiber = FiberNode & {
